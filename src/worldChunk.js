@@ -14,14 +14,13 @@ import {
   PlaneGeometry,
   Quaternion,
   Vector3,
-  // } from 'three'
-} from '../node_modules/three/build/three.module.js'
+} from 'three'
 
-import { SimplexNoise } from '../node_modules/three/examples/jsm/math/SimplexNoise.js'
+import { SimplexNoise } from 'three/examples/jsm/math/SimplexNoise.js'
 
 import { RNG } from './rng'
 import { blocks } from './blocks'
-import { Water } from '../node_modules/three/examples/jsm/Addons.js'
+import { Water } from 'three/examples/jsm/Addons.js'
 
 export class WorldChunk extends Group {
   constructor(size, params, rapier, physicsWorld) {

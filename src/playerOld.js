@@ -6,8 +6,8 @@ import {
   MeshBasicMaterial,
   PerspectiveCamera,
   Vector3,
-} from '../node_modules/three'
-import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
+} from 'three'
+// import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
 
 export class Player {
   constructor(scene) {
@@ -17,7 +17,7 @@ export class Player {
       0.1,
       200,
     )
-    this.controls = new PointerLockControls(this.camera, document.body)
+    // this.controls = new PointerLockControls(this.camera, document.body)
     this.cameraHelper = new CameraHelper(this.camera)
 
     this.camera.position.set(8, 32, 8)

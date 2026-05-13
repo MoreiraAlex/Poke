@@ -6,8 +6,7 @@ import {
   RepeatWrapping,
   MeshBasicMaterial,
   DoubleSide,
-  // } from 'three'
-} from '../node_modules/three/build/three.module.js'
+} from 'three'
 
 const textureLoader = new TextureLoader()
 

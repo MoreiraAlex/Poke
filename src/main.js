@@ -11,9 +11,8 @@ import {
   Vector2,
   Vector3,
   WebGLRenderer,
-  // } from 'three'
-} from '../node_modules/three/build/three.module.js'
-import Stats from '../node_modules/three/examples/jsm/libs/stats.module.js'
+} from 'three'
+import Stats from 'three/examples/jsm/libs/stats.module.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { setupUI } from './ui'
 import { Player } from './player'
