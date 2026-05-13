@@ -417,7 +417,7 @@ export class WorldChunk extends Group {
 
   generateResources(rng, biome) {
     if (biome === 'Forest' || biome === 'Jungle') {
-      this.generateGrassMeshes(rng, biome)
+      // this.generateGrassMeshes(rng, biome)
       this.generateTreeMeshes(rng, biome)
     }
 

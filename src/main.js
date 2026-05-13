@@ -100,7 +100,7 @@ function update(time) {
   timer.update(time)
   const delta = timer.getDelta()
 
-  if (player.controls.isLocked) {
+  if (player.controls.isLocked || player.isMobile) {
     physicsWorld.step()
 
     player.update()
@@ -132,7 +132,10 @@ function update(time) {
     shader.uniforms.uTime.value = performance.now() * 0.002
   }
 
-  renderer.render(scene, player.controls.isLocked ? player.camera : orbitCamera)
+  renderer.render(
+    scene,
+    player.controls.isLocked || player.isMobile ? player.camera : orbitCamera,
+  )
   stats.update()
 }
 
