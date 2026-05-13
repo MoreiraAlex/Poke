@@ -150,5 +150,5 @@ window.addEventListener('resize', () => {
 })
 
 setupLights()
-// setupUI(scene, world, player)
+setupUI(scene, world, player)
 // update()

@@ -261,7 +261,8 @@ export class WorldChunk extends Group {
     }
 
     if (hasWater) {
-      this.generateWater()
+      // this.generateWater()
+      this.generateWaterOld()
     }
 
     const width = this.size.width
@@ -1085,9 +1086,9 @@ export class WorldChunk extends Group {
 
   generateWaterOld() {
     const material = new MeshLambertMaterial({
-      color: 0x9090e0,
+      color: 0x2d6cdf,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.8,
       side: DoubleSide,
     })
 

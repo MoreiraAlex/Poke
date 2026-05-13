@@ -4,11 +4,11 @@ import {
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
-  Quaternion,
   Vector3,
 } from 'three'
 
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
+import { MobileControls } from './mobileControls'
 
 export class Player {
   constructor(scene, rapier, physicsWorld) {
@@ -17,6 +17,13 @@ export class Player {
 
     this.isMobile = 'ontouchstart' in window
 
+    // mobile controls
+    this.mobile = this.isMobile ? new MobileControls() : null
+
+    this.mobileStates = {
+      jumpPressed: false,
+      rollPressed: false,
+    }
     // câmera
     this.camera = new PerspectiveCamera(
       70,
@@ -29,26 +36,22 @@ export class Player {
 
     scene.add(this.camera)
 
-    // input
+    // input desktop
     this.input = new Vector3()
 
-    this.maxSpeed = 10
+    this.walkSpeed = 10
+    this.runSpeed = 20
+    this.currentSpeed = this.walkSpeed
 
     // dimensões
     this.radius = 0.5
     this.height = 1.75
 
-    // ===== MOBILE =====
-    this.touch = {
-      forward: false,
-      backward: false,
-      left: false,
-      right: false,
-    }
+    // ===== CAMERA SYSTEM =====
 
-    this.cameraRotation = {
-      yaw: 0,
-      pitch: 0,
+    this.mouse = {
+      x: 0,
+      y: 0,
     }
 
     this.touchLook = {
@@ -58,6 +61,7 @@ export class Player {
     }
 
     // ===== RIGID BODY =====
+
     const bodyDesc = this.rapier.RigidBodyDesc.dynamic().setTranslation(
       8,
       32,
@@ -67,6 +71,7 @@ export class Player {
     this.body = this.world.createRigidBody(bodyDesc)
 
     // ===== COLLIDER =====
+
     const colliderDesc = this.rapier.ColliderDesc.capsule(
       this.height / 2 - this.radius,
       this.radius,
@@ -76,7 +81,8 @@ export class Player {
 
     this.body.lockRotations(true)
 
-    // ===== MESH =====
+    // ===== DEBUG MESH =====
+
     this.mesh = new Mesh(
       new CapsuleGeometry(this.radius, this.height - this.radius * 2, 4, 8),
       new MeshBasicMaterial({
@@ -91,71 +97,56 @@ export class Player {
     document.addEventListener('keydown', this.onKeyDown.bind(this))
     document.addEventListener('keyup', this.onKeyUp.bind(this))
 
+    // mouse
+    this.setupMouseLook()
+
     // mobile
-    this.setupMobileControls()
     this.setupMobileLook()
   }
 
-  setupMobileControls() {
-    if (!this.isMobile) return
+  setupMouseLook() {
+    if (this.isMobile) return
 
-    const createButton = (text, x, y) => {
-      const btn = document.createElement('button')
+    document.body.addEventListener('click', () => {
+      this.controls.lock()
+    })
 
-      btn.innerText = text
+    document.addEventListener('mousemove', (e) => {
+      if (!this.controls.isLocked) return
 
-      btn.style.position = 'fixed'
-      btn.style.left = x
-      btn.style.bottom = y
-      btn.style.width = '70px'
-      btn.style.height = '70px'
-      btn.style.zIndex = '999'
-      btn.style.opacity = '0.5'
-      btn.style.borderRadius = '50%'
-      btn.style.fontSize = '24px'
-      btn.style.border = 'none'
+      this.mouse.x -= e.movementX * 0.002
+      this.mouse.y -= e.movementY * 0.002
 
-      document.body.appendChild(btn)
-
-      return btn
-    }
-
-    const up = createButton('↑', '90px', '140px')
-    const down = createButton('↓', '90px', '20px')
-    const left = createButton('←', '10px', '80px')
-    const right = createButton('→', '170px', '80px')
-
-    const bind = (button, key) => {
-      button.addEventListener('touchstart', (e) => {
-        e.preventDefault()
-        this.touch[key] = true
-      })
-
-      button.addEventListener('touchend', (e) => {
-        e.preventDefault()
-        this.touch[key] = false
-      })
-    }
-
-    bind(up, 'forward')
-    bind(down, 'backward')
-    bind(left, 'left')
-    bind(right, 'right')
+      this.mouse.y = Math.max(-0.5, Math.min(0.2, this.mouse.y))
+    })
   }
 
   setupMobileLook() {
     if (!this.isMobile) return
 
+    this.touchLook = {
+      active: false,
+      id: null,
+      lastX: 0,
+      lastY: 0,
+    }
+
     document.addEventListener(
       'touchstart',
       (e) => {
-        if (e.touches.length !== 1) return
+        for (const touch of e.changedTouches) {
+          // apenas lado direito da tela
+          if (touch.clientX < window.innerWidth * 0.4) continue
 
-        const touch = e.touches[0]
+          // já existe câmera ativa
+          if (this.touchLook.active) continue
 
-        this.touchLook.active = true
-        this.touchLook.lastX = touch.clientX
-        this.touchLook.lastY = touch.clientY
+          this.touchLook.active = true
+          this.touchLook.id = touch.identifier
+
+          this.touchLook.lastX = touch.clientX
+          this.touchLook.lastY = touch.clientY
+        }
       },
       { passive: false },
     )
@@ -164,40 +155,40 @@ export class Player {
       'touchmove',
       (e) => {
         if (!this.touchLook.active) return
-        if (e.touches.length !== 1) return
 
-        const touch = e.touches[0]
+        let activeTouch = null
 
-        const deltaX = touch.clientX - this.touchLook.lastX
-        const deltaY = touch.clientY - this.touchLook.lastY
+        for (const touch of e.changedTouches) {
+          if (touch.identifier === this.touchLook.id) {
+            activeTouch = touch
+            break
+          }
+        }
 
-        this.touchLook.lastX = touch.clientX
-        this.touchLook.lastY = touch.clientY
+        if (!activeTouch) return
 
-        this.cameraRotation.yaw -= deltaX * 0.003
-        this.cameraRotation.pitch -= deltaY * 0.003
+        const deltaX = activeTouch.clientX - this.touchLook.lastX
 
-        const limit = Math.PI / 2 - 0.1
+        const deltaY = activeTouch.clientY - this.touchLook.lastY
 
-        this.cameraRotation.pitch = Math.max(
-          -limit,
-          Math.min(limit, this.cameraRotation.pitch),
-        )
+        this.touchLook.lastX = activeTouch.clientX
+        this.touchLook.lastY = activeTouch.clientY
 
-        const euler = new Euler(
-          this.cameraRotation.pitch,
-          this.cameraRotation.yaw,
-          0,
-          'YXZ',
-        )
+        this.mouse.x -= deltaX * 0.005
+        this.mouse.y -= deltaY * 0.005
 
-        this.camera.quaternion.setFromEuler(euler)
+        this.mouse.y = Math.max(-0.5, Math.min(0.2, this.mouse.y))
       },
       { passive: false },
     )
 
-    document.addEventListener('touchend', () => {
-      this.touchLook.active = false
+    document.addEventListener('touchend', (e) => {
+      for (const touch of e.changedTouches) {
+        if (touch.identifier === this.touchLook.id) {
+          this.touchLook.active = false
+          this.touchLook.id = null
+        }
+      }
     })
   }
 
@@ -208,37 +199,66 @@ export class Player {
   update() {
     if (!this.isMobile && !this.controls.isLocked) return
 
-    // direção câmera
-    const forward = new Vector3(0, 0, -1).applyQuaternion(
-      this.camera.quaternion,
+    // ===== DIREÇÃO DA CÂMERA =====
+
+    const yaw = this.mouse.x
+    const pitch = this.mouse.y
+
+    // ===== INPUT =====
+
+    let moveX = this.input.x
+    let moveZ = this.input.z
+
+    // mobile joystick
+    if (this.mobile) {
+      moveX += this.mobile.input.moveX * this.currentSpeed
+      moveZ += -this.mobile.input.moveY * this.currentSpeed
+
+      // JUMP
+
+      if (this.mobile.input.jump && !this.mobileStates.jumpPressed) {
+        this.mobileStates.jumpPressed = true
+        this.jump()
+      }
+
+      if (!this.mobile.input.jump) {
+        this.mobileStates.jumpPressed = false
+      }
+
+      // ROLL
+
+      if (this.mobile.input.roll && !this.mobileStates.rollPressed) {
+        this.mobileStates.rollPressed = true
+        this.dash()
+      }
+
+      if (!this.mobile.input.roll) {
+        this.mobileStates.rollPressed = false
+      }
+    }
+
+    // ===== MOVIMENTO RELATIVO À CÂMERA =====
+
+    const direction = new Vector3()
+
+    if (moveX !== 0 || moveZ !== 0) {
+      direction.set(
+        Math.sin(yaw) * moveZ + Math.cos(yaw) * moveX,
+        0,
+        Math.cos(yaw) * moveZ - Math.sin(yaw) * moveX,
+      )
+
+      direction.normalize()
+    }
+
+    const move = new Vector3(
+      direction.x * this.currentSpeed,
+      0,
+      direction.z * this.currentSpeed,
     )
-
-    const right = new Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion)
-
-    forward.y = 0
-    right.y = 0
-
-    forward.normalize()
-    right.normalize()
-
-    let forwardInput = this.input.z
-    let rightInput = this.input.x
-
-    // mobile
-    if (this.touch.forward) forwardInput += this.maxSpeed
-    if (this.touch.backward) forwardInput -= this.maxSpeed
-
-    if (this.touch.right) rightInput += this.maxSpeed
-    if (this.touch.left) rightInput -= this.maxSpeed
-
-    const move = new Vector3()
-
-    move.addScaledVector(forward, forwardInput)
-    move.addScaledVector(right, rightInput)
 
     const vel = this.body.linvel()
 
-    // movimento
     this.body.setLinvel(
       {
         x: move.x,
@@ -248,24 +268,50 @@ export class Player {
       true,
     )
 
-    // sync
+    // ===== SYNC =====
+
     const pos = this.body.translation()
 
     this.mesh.position.set(pos.x, pos.y, pos.z)
 
-    // câmera terceira pessoa
-    // const offset = new Vector3(0, this.height / 2, 5)
-    const offset = new Vector3(0, this.height, 6)
+    // ===== CAMERA SYSTEM =====
+    // recuperado do outro player
 
-    offset.applyQuaternion(this.camera.quaternion)
+    const distance = 6
+    const height = 1.5
+    const shoulderOffset = 0
 
-    this.camera.position.copy(this.mesh.position).add(offset)
+    const target = new Vector3(
+      this.position.x,
+      this.position.y + height,
+      this.position.z,
+    )
 
-    // this.camera.lookAt(
-    //   this.mesh.position.x,
-    //   this.mesh.position.y + this.height / 2,
-    //   this.mesh.position.z,
-    // )
+    const dir = new Vector3(
+      Math.sin(yaw) * Math.cos(pitch),
+      Math.sin(pitch),
+      Math.cos(yaw) * Math.cos(pitch),
+    )
+
+    // posição atrás do player
+    const cameraPos = target.clone().sub(dir.clone().multiplyScalar(distance))
+
+    // offset ombro
+    const up = new Vector3(0, 1, 0)
+
+    const right = new Vector3().crossVectors(dir, up).normalize()
+
+    cameraPos.add(right.multiplyScalar(shoulderOffset))
+
+    // suavização
+    this.camera.position.lerp(cameraPos, 0.12)
+
+    // look target
+    const lookTarget = target.clone().add(dir.clone().multiplyScalar(10))
+
+    this.camera.lookAt(lookTarget)
+
+    // ===== DEBUG =====
 
     document.getElementById('player-position').innerHTML = this.toString()
   }
@@ -278,7 +324,7 @@ export class Player {
       { x: 0, y: -1, z: 0 },
     )
 
-    const hit = this.world.castRay(ray, this.height / 2 + 0.1, true)
+    const hit = this.world.castRay(ray, this.height / 2 + 0.15, true)
 
     return hit !== null
   }
@@ -286,11 +332,28 @@ export class Player {
   jump() {
     if (!this.isOnGround()) return
 
+    const vel = this.body.linvel()
+
+    this.body.setLinvel(
+      {
+        x: vel.x,
+        y: 10,
+        z: vel.z,
+      },
+      true,
+    )
+  }
+
+  dash() {
+    const yaw = this.mouse.x
+
+    const forward = new Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize()
+
     this.body.applyImpulse(
       {
-        x: 0,
-        y: 10,
-        z: 0,
+        x: forward.x * 8,
+        y: 0,
+        z: forward.z * 8,
       },
       true,
     )
@@ -303,34 +366,28 @@ export class Player {
 
     switch (event.code) {
       case 'KeyW':
-        this.input.z = this.maxSpeed
+        this.input.z = 1
         break
 
       case 'KeyS':
-        this.input.z = -this.maxSpeed
+        this.input.z = -1
         break
 
       case 'KeyA':
-        this.input.x = -this.maxSpeed
+        this.input.x = 1
         break
 
       case 'KeyD':
-        this.input.x = this.maxSpeed
+        this.input.x = -1
         break
 
       case 'KeyE':
+      case 'Space':
         this.jump()
         break
 
       case 'ShiftLeft':
-        this.maxSpeed = 50
-
-        if (this.input.z > 0) this.input.z = this.maxSpeed
-        if (this.input.z < 0) this.input.z = -this.maxSpeed
-
-        if (this.input.x > 0) this.input.x = this.maxSpeed
-        if (this.input.x < 0) this.input.x = -this.maxSpeed
-
+        this.currentSpeed = this.runSpeed
         break
     }
   }
@@ -348,14 +405,7 @@ export class Player {
         break
 
       case 'ShiftLeft':
-        this.maxSpeed = 10
-
-        if (this.input.z > 0) this.input.z = this.maxSpeed
-        if (this.input.z < 0) this.input.z = -this.maxSpeed
-
-        if (this.input.x > 0) this.input.x = this.maxSpeed
-        if (this.input.x < 0) this.input.x = -this.maxSpeed
-
+        this.currentSpeed = this.walkSpeed
         break
     }
   }
