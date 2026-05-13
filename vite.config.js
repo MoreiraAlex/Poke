@@ -2,7 +2,7 @@
  * @type {import('vite').UserConfig}
  */
 export default {
-  base: '/pokemon/',
+  base: '/Poke/',
   build: {
     sourcemap: true,
   },
