@@ -1,6 +1,6 @@
 import {
+  AnimationMixer,
   CapsuleGeometry,
-  Euler,
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
@@ -9,6 +9,7 @@ import {
 
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
 import { MobileControls } from './mobileControls'
+import { loadFBX } from '../../Pokemon/src/utils/loader'
 
 export class Player {
   constructor(scene, rapier, physicsWorld) {
@@ -39,13 +40,13 @@ export class Player {
     // input desktop
     this.input = new Vector3()
 
-    this.walkSpeed = 10
-    this.runSpeed = 20
+    this.walkSpeed = 2
+    this.runSpeed = 5
     this.currentSpeed = this.walkSpeed
 
     // dimensões
-    this.radius = 0.5
-    this.height = 1.75
+    this.radius = 0.3
+    this.height = 1.3
 
     // ===== CAMERA SYSTEM =====
 
@@ -93,6 +94,12 @@ export class Player {
 
     scene.add(this.mesh)
 
+    this.model = null
+    this.actions = {}
+    this.activeAction = null
+    this.mixer = null
+    this.animationFadeDuration = 0.15
+
     // eventos teclado
     document.addEventListener('keydown', this.onKeyDown.bind(this))
     document.addEventListener('keyup', this.onKeyUp.bind(this))
@@ -102,6 +109,78 @@ export class Player {
 
     // mobile
     this.setupMobileLook()
+    this.loadModel(scene)
+  }
+
+  async loadModel(scene) {
+    const idle = await loadFBX('/Poke/models/Male/Idle.fbx')
+
+    this.model = idle
+
+    this.model.scale.setScalar(0.01)
+
+    this.model.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.castShadow = true
+        obj.receiveShadow = true
+      }
+    })
+
+    scene.add(this.model)
+
+    /*
+     * MIXER
+     */
+
+    this.mixer = new AnimationMixer(this.model)
+
+    /*
+     * ANIMATIONS
+     */
+
+    this.actions.idle = this.mixer.clipAction(idle.animations[0])
+
+    const walk = await loadFBX('/Poke/models/Male/Walking.fbx')
+
+    this.actions.walk = this.mixer.clipAction(walk.animations[0])
+
+    const run = await loadFBX('/Poke/models/Male/Run.fbx')
+
+    this.actions.run = this.mixer.clipAction(run.animations[0])
+
+    const jump = await loadFBX('/Poke/models/Male/Jumping.fbx')
+
+    this.actions.jump = this.mixer.clipAction(jump.animations[0])
+
+    const falling = await loadFBX('/Poke/models/Male/Falling.fbx')
+
+    this.actions.falling = this.mixer.clipAction(falling.animations[0])
+
+    const roll = await loadFBX('/Poke/models/Male/Roll3.fbx')
+
+    this.actions.roll = this.mixer.clipAction(roll.animations[0])
+
+    /*
+     * DEFAULT
+     */
+
+    this.playAnimation('idle')
+  }
+
+  playAnimation(name) {
+    const action = this.actions[name]
+
+    if (!action) return
+
+    if (this.activeAction === action) return
+
+    if (this.activeAction) {
+      this.activeAction.fadeOut(this.animationFadeDuration)
+    }
+
+    action.reset().fadeIn(this.animationFadeDuration).play()
+
+    this.activeAction = action
   }
 
   setupMouseLook() {
@@ -177,7 +256,7 @@ export class Player {
         this.mouse.x -= deltaX * 0.005
         this.mouse.y -= deltaY * 0.005
 
-        this.mouse.y = Math.max(-0.5, Math.min(0.2, this.mouse.y))
+        this.mouse.y = Math.max(-0.5, Math.min(0.5, this.mouse.y))
       },
       { passive: false },
     )
@@ -196,7 +275,11 @@ export class Player {
     return this.mesh.position
   }
 
-  update() {
+  update(delta) {
+    if (this.mixer) {
+      this.mixer.update(delta)
+    }
+
     if (!this.isMobile && !this.controls.isLocked) return
 
     // ===== DIREÇÃO DA CÂMERA =====
@@ -269,14 +352,23 @@ export class Player {
       true,
     )
 
+    if (direction.lengthSq() > 0.0001 && this.model) {
+      const targetRotation = Math.atan2(direction.x, direction.z)
+
+      this.model.rotation.y = targetRotation
+    }
+
     // ===== SYNC =====
     const pos = this.body.translation()
     this.mesh.position.set(pos.x, pos.y, pos.z)
+    if (this.model) {
+      this.model.position.set(pos.x, pos.y - this.height / 2, pos.z)
+    }
 
     // ===== CAMERA SYSTEM =====
     const distance = 1.8
-    const height = 1.2
-    const shoulderOffset = 1.5
+    const height = 1
+    const shoulderOffset = 1.3
 
     const target = new Vector3(
       this.position.x,
@@ -299,7 +391,7 @@ export class Player {
     cameraPos.add(right.multiplyScalar(shoulderOffset))
 
     // suavização
-    this.camera.position.lerp(cameraPos, 0.12)
+    this.camera.position.lerp(cameraPos, 0.5)
 
     // look target
     const lookTarget = target.clone().add(dir.clone().multiplyScalar(10))
@@ -310,6 +402,24 @@ export class Player {
 
     const horizontalSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z)
     console.log(`SPEED: ${horizontalSpeed.toFixed(2)}`)
+
+    const grounded = this.isOnGround()
+
+    if (!grounded) {
+      if (vel.y > 0) {
+        this.playAnimation('jump')
+      } else {
+        this.playAnimation('falling')
+      }
+    } else {
+      if (horizontalSpeed < 0.1) {
+        this.playAnimation('idle')
+      } else if (horizontalSpeed < this.runSpeed * 0.6) {
+        this.playAnimation('walk')
+      } else {
+        this.playAnimation('run')
+      }
+    }
   }
 
   isOnGround() {

@@ -103,7 +103,7 @@ function update(time) {
   if (player.controls.isLocked || player.isMobile) {
     physicsWorld.step()
 
-    player.update()
+    player.update(delta)
     world.update(player)
 
     if (world.isUnderwater) {

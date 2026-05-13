@@ -19,7 +19,7 @@ export class World extends Group {
         waterOffset: 24,
       },
       biomes: {
-        scale: 10000,
+        scale: 1000,
         variation: {
           amplitude: 0.1,
           scale: 100,
