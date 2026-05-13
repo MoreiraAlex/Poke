@@ -1,4 +1,5 @@
-import { Group } from 'three'
+// import { Group } from 'three'
+import { Group } from '../node_modules/three/build/three.module.js'
 import { WorldChunk } from './worldChunk'
 
 export class World extends Group {

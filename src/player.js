@@ -4,7 +4,8 @@ import {
   MeshBasicMaterial,
   PerspectiveCamera,
   Vector3,
-} from 'three'
+  // } from 'three'
+} from '../node_modules/three/build/three.module.js'
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
 
 export class Player {

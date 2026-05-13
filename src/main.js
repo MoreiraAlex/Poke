@@ -11,15 +11,15 @@ import {
   Vector2,
   Vector3,
   WebGLRenderer,
-} from 'three'
-import Stats from 'three/examples/jsm/libs/stats.module.js'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+  // } from 'three'
+} from '../node_modules/three/build/three.module.js'
+import Stats from '../node_modules/three/examples/jsm/libs/stats.module.js'
+import { OrbitControls } from '../node_modules/three/addons/controls/OrbitControls.js'
 import { setupUI } from './ui'
 import { Player } from './player'
 import { World } from './world'
 import RAPIER from '@dimforge/rapier3d-compat'
 import { blocks } from './blocks'
-import { WebGPURenderer } from 'three/webgpu'
 
 await RAPIER.init()
 const gravity = { x: 0, y: -50, z: 0 }
