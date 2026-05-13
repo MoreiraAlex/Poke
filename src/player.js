@@ -78,7 +78,8 @@ export class Player {
       this.radius,
     )
 
-    this.world.createCollider(colliderDesc, this.body)
+    // this.world.createCollider(colliderDesc, this.body)
+    this.collider = this.world.createCollider(colliderDesc, this.body)
 
     this.body.lockRotations(true)
 
@@ -92,7 +93,7 @@ export class Player {
       }),
     )
 
-    scene.add(this.mesh)
+    // scene.add(this.mesh)
 
     this.model = null
     this.actions = {}
@@ -116,7 +117,6 @@ export class Player {
     const idle = await loadFBX('/Poke/models/Male/Idle.fbx')
 
     this.model = idle
-
     this.model.scale.setScalar(0.01)
 
     this.model.traverse((obj) => {
@@ -131,39 +131,31 @@ export class Player {
     /*
      * MIXER
      */
-
     this.mixer = new AnimationMixer(this.model)
 
     /*
      * ANIMATIONS
      */
-
     this.actions.idle = this.mixer.clipAction(idle.animations[0])
 
     const walk = await loadFBX('/Poke/models/Male/Walking.fbx')
-
     this.actions.walk = this.mixer.clipAction(walk.animations[0])
 
     const run = await loadFBX('/Poke/models/Male/Run.fbx')
-
     this.actions.run = this.mixer.clipAction(run.animations[0])
 
     const jump = await loadFBX('/Poke/models/Male/Jumping.fbx')
-
     this.actions.jump = this.mixer.clipAction(jump.animations[0])
 
     const falling = await loadFBX('/Poke/models/Male/Falling.fbx')
-
     this.actions.falling = this.mixer.clipAction(falling.animations[0])
 
     const roll = await loadFBX('/Poke/models/Male/Roll3.fbx')
-
     this.actions.roll = this.mixer.clipAction(roll.animations[0])
 
     /*
      * DEFAULT
      */
-
     this.playAnimation('idle')
   }
 
@@ -179,7 +171,6 @@ export class Player {
     }
 
     action.reset().fadeIn(this.animationFadeDuration).play()
-
     this.activeAction = action
   }
 
@@ -272,6 +263,8 @@ export class Player {
   }
 
   get position() {
+    if (this.model) return this.model.position
+
     return this.mesh.position
   }
 
@@ -360,15 +353,15 @@ export class Player {
 
     // ===== SYNC =====
     const pos = this.body.translation()
-    this.mesh.position.set(pos.x, pos.y, pos.z)
+    // this.mesh.position.set(pos.x, pos.y, pos.z)
     if (this.model) {
       this.model.position.set(pos.x, pos.y - this.height / 2, pos.z)
     }
 
     // ===== CAMERA SYSTEM =====
-    const distance = 1.8
-    const height = 1
-    const shoulderOffset = 1.3
+    const distance = 2.2
+    const height = 1.55
+    const shoulderOffset = 0
 
     const target = new Vector3(
       this.position.x,
@@ -401,16 +394,16 @@ export class Player {
     document.getElementById('player-position').innerHTML = this.toString()
 
     const horizontalSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z)
-    console.log(`SPEED: ${horizontalSpeed.toFixed(2)}`)
+    // console.log(`SPEED: ${horizontalSpeed.toFixed(2)}`)
 
     const grounded = this.isOnGround()
 
     if (!grounded) {
-      if (vel.y > 0) {
-        this.playAnimation('jump')
-      } else {
-        this.playAnimation('falling')
-      }
+      this.playAnimation('falling')
+      // if (vel.y > 0) {
+      //   this.playAnimation('jump')
+      // } else {
+      // }
     } else {
       if (horizontalSpeed < 0.1) {
         this.playAnimation('idle')
@@ -425,17 +418,32 @@ export class Player {
   isOnGround() {
     const origin = this.body.translation()
 
-    const ray = new this.rapier.Ray(
-      { x: origin.x, y: origin.y, z: origin.z },
-      { x: 0, y: -1, z: 0 },
+    const rayOrigin = {
+      x: origin.x,
+      y: origin.y - (this.height / 2 - this.radius),
+      z: origin.z,
+    }
+
+    const ray = new this.rapier.Ray(rayOrigin, { x: 0, y: -2, z: 0 })
+
+    const hit = this.world.castRay(
+      ray,
+      0.2,
+      true,
+      undefined,
+      undefined,
+      this.collider,
     )
 
-    const hit = this.world.castRay(ray, this.height / 2 + 0.15, true)
+    console.log(hit)
+
     return hit !== null
   }
 
   jump() {
     if (!this.isOnGround()) return
+
+    this.playAnimation('jump')
 
     const vel = this.body.linvel()
     this.body.setLinvel(
