@@ -24,6 +24,15 @@ export class MobileControls {
     this.show()
     this.initJoystick()
     this.initButtons()
+    this.enterFullscreen()
+  }
+
+  enterFullscreen() {
+    const element = document.documentElement
+
+    if (element.requestFullscreen) {
+      element.requestFullscreen()
+    }
   }
 
   show() {
