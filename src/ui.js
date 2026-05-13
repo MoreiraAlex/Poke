@@ -46,12 +46,12 @@ export function setupUI(scene, world, player) {
   //   .add(world.params.trees.canopy, 'density', 0, 1)
   //   .name('Canopy Density')
 
-  const worldFolder = gui.addFolder('World')
+  const worldFolder = gui.addFolder('World').close()
   worldFolder.add(world, 'asyncLoading', 0, 5, 1).name('AsyncLoading')
   worldFolder.add(world, 'drawDistance', 0, 5, 1).name('DrawDistance')
+  worldFolder.add(world.chunkSize, 'width', 12, 256, 1).name('Width')
 
-  // const terrainFolder = worldFolder.addFolder('Terrain').close()
-  // terrainFolder.add(world.params, 'seed', 0, 1000).name('Seed')
+  // const terrainFolder = gui.addFolder('Terrain').close()
   // terrainFolder.add(world.params.terrain, 'scale', 10, 100).name('Scale')
   // terrainFolder.add(world.params.terrain, 'magnitude', 0, 1).name('Magnitude')
   // terrainFolder.add(world.params.terrain, 'offset', 0, 1).name('Offset')

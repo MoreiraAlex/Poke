@@ -19,7 +19,7 @@ export class World extends Group {
         waterOffset: 24,
       },
       biomes: {
-        scale: 2000,
+        scale: 10000,
         variation: {
           amplitude: 0.1,
           scale: 100,
@@ -52,7 +52,7 @@ export class World extends Group {
               canopy: {
                 minRadius: 3,
                 maxRadius: 3,
-                density: 0.7, // Vary between 0.0 and 1.0
+                density: 0.7,
               },
               frequency: 0.005,
             },
@@ -66,10 +66,10 @@ export class World extends Group {
               minPatchDistance: 4,
             },
             rocks: {
-              frequency: 0.01,
+              frequency: 0.005,
               maxCount: 2000,
               minSize: 0.5,
-              maxSize: 1.5,
+              maxSize: 5.5,
             },
           },
           Jungle: {
@@ -82,7 +82,7 @@ export class World extends Group {
               canopy: {
                 minRadius: 3,
                 maxRadius: 3,
-                density: 0.7, // Vary between 0.0 and 1.0
+                density: 0.7,
               },
               frequency: 0.01,
             },

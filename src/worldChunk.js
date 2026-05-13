@@ -13,6 +13,8 @@ import {
   MeshLambertMaterial,
   PlaneGeometry,
   Quaternion,
+  RepeatWrapping,
+  ShaderMaterial,
   Vector3,
 } from 'three'
 
@@ -408,6 +410,312 @@ export class WorldChunk extends Group {
 
       this.generateResources(rng, biome)
     }
+  }
+
+  generateSurfaceMeshOld(rng) {
+    this.clear()
+
+    let hasWater = false
+
+    for (let x = 0; x < this.size.width; x++) {
+      for (let z = 0; z < this.size.width; z++) {
+        if (this.getTerrainHeight(x, z) <= this.params.terrain.waterOffset) {
+          hasWater = true
+          break
+        }
+      }
+
+      if (hasWater) {
+        break
+      }
+    }
+
+    if (hasWater) {
+      this.generateWaterOld()
+    }
+
+    const width = this.size.width
+    const depth = this.size.width
+
+    /*
+     * TEXTURES
+     */
+
+    const grassTexture = blocks.grass.material[2].map
+    const sandTexture = blocks.sand.material.map
+
+    grassTexture.wrapS = RepeatWrapping
+    grassTexture.wrapT = RepeatWrapping
+
+    sandTexture.wrapS = RepeatWrapping
+    sandTexture.wrapT = RepeatWrapping
+
+    /*
+     * GEOMETRY
+     */
+
+    const vertices = []
+    const uvs = []
+    const indices = []
+    const blends = []
+
+    let indexOffset = 0
+
+    const uvScale = 4
+
+    for (let x = 0; x < width; x++) {
+      for (let z = 0; z < depth; z++) {
+        const biome = this.getTerrainBiome(x, z)
+
+        const h00 = this.getTerrainHeight(x, z)
+        const h10 = this.getTerrainHeight(x + 1, z)
+        const h11 = this.getTerrainHeight(x + 1, z + 1)
+        const h01 = this.getTerrainHeight(x, z + 1)
+
+        const worldX = this.position.x + x
+        const worldZ = this.position.z + z
+
+        /*
+         * POSITIONS
+         */
+
+        vertices.push(
+          x,
+          h00,
+          z,
+
+          x + 1,
+          h10,
+          z,
+
+          x + 1,
+          h11,
+          z + 1,
+
+          x,
+          h01,
+          z + 1,
+        )
+
+        /*
+         * UVS
+         */
+
+        uvs.push(
+          worldX / uvScale,
+          worldZ / uvScale,
+
+          (worldX + 1) / uvScale,
+          worldZ / uvScale,
+
+          (worldX + 1) / uvScale,
+          (worldZ + 1) / uvScale,
+
+          worldX / uvScale,
+          (worldZ + 1) / uvScale,
+        )
+
+        /*
+         * BLEND
+         */
+
+        // 0 = grass
+        // 1 = sand
+
+        let blend = biome === 'Desert' ? 1 : 0
+
+        const neighbors = [
+          this.getTerrainBiome(x + 1, z),
+          this.getTerrainBiome(x - 1, z),
+          this.getTerrainBiome(x, z + 1),
+          this.getTerrainBiome(x, z - 1),
+        ]
+
+        let different = 0
+
+        for (const n of neighbors) {
+          if (n !== biome) {
+            different++
+          }
+        }
+
+        const edgeBlend = different / 4
+
+        // suaviza borda
+        if (biome === 'Desert') {
+          blend = 1 - edgeBlend * 1
+        } else {
+          blend = edgeBlend * 1
+        }
+
+        blends.push(blend, blend, blend, blend)
+
+        /*
+         * INDICES
+         */
+
+        const i = indexOffset
+
+        indices.push(
+          i,
+          i + 3,
+          i + 1,
+
+          i + 1,
+          i + 3,
+          i + 2,
+        )
+
+        indexOffset += 4
+      }
+    }
+
+    /*
+     * GEOMETRY
+     */
+
+    const geometry = new BufferGeometry()
+
+    geometry.setAttribute('position', new Float32BufferAttribute(vertices, 3))
+
+    geometry.setAttribute('uv', new Float32BufferAttribute(uvs, 2))
+
+    geometry.setAttribute('blend', new Float32BufferAttribute(blends, 1))
+
+    geometry.setIndex(indices)
+
+    geometry.computeVertexNormals()
+
+    /*
+     * MATERIAL
+     */
+
+    const material = new ShaderMaterial({
+      uniforms: {
+        grassTexture: {
+          value: grassTexture,
+        },
+
+        sandTexture: {
+          value: sandTexture,
+        },
+      },
+
+      vertexShader: `
+      attribute float blend;
+
+      varying vec2 vUv;
+      varying float vBlend;
+
+      void main() {
+
+        vUv = uv;
+        vBlend = blend;
+
+        gl_Position =
+          projectionMatrix *
+          modelViewMatrix *
+          vec4(position, 1.0);
+
+      }
+    `,
+
+      fragmentShader: `
+      uniform sampler2D grassTexture;
+      uniform sampler2D sandTexture;
+
+      varying vec2 vUv;
+      varying float vBlend;
+
+      void main() {
+
+        vec2 tiledUv = vUv;
+
+        vec4 grass =
+          texture2D(grassTexture, tiledUv);
+
+        vec4 sand =
+          texture2D(sandTexture, tiledUv);
+
+        // noise fake pra quebrar borda reta
+        float noise =
+          sin(vUv.x * 20.0) *
+          sin(vUv.y * 20.0) * 0.08;
+
+        float blend =
+          clamp(vBlend + noise, 0.0, 1.0);
+
+        vec4 finalColor =
+          mix(grass, sand, blend);
+
+        gl_FragColor = finalColor;
+
+      }
+    `,
+    })
+
+    /*
+     * MESH
+     */
+
+    const mesh = new Mesh(geometry, material)
+
+    mesh.castShadow = true
+    mesh.receiveShadow = true
+
+    this.add(mesh)
+
+    /*
+     * PHYSICS
+     */
+
+    const colliderDesc = this.rapier.ColliderDesc.trimesh(
+      geometry.attributes.position.array,
+      geometry.index.array,
+    )
+
+    const body = this.physicsWorld.createRigidBody(
+      this.rapier.RigidBodyDesc.fixed().setTranslation(
+        this.position.x,
+        this.position.y,
+        this.position.z,
+      ),
+    )
+
+    this.physicsWorld.createCollider(colliderDesc, body)
+
+    /*
+     * RESOURCES
+     */
+
+    for (const biome in this.params.biomes.biomeSettings) {
+      this.generateResources(rng, biome)
+    }
+  }
+
+  getBlendFactor(x, z) {
+    const biome = this.getTerrainBiome(x, z)
+
+    let blend = 0
+
+    const neighbors = [
+      this.getTerrainBiome(x + 1, z),
+      this.getTerrainBiome(x - 1, z),
+      this.getTerrainBiome(x, z + 1),
+      this.getTerrainBiome(x, z - 1),
+    ]
+
+    let different = 0
+
+    for (const n of neighbors) {
+      if (n !== biome) {
+        different++
+      }
+    }
+
+    blend = different / 4
+
+    return blend
   }
 
   /*

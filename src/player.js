@@ -200,22 +200,19 @@ export class Player {
     if (!this.isMobile && !this.controls.isLocked) return
 
     // ===== DIREÇÃO DA CÂMERA =====
-
     const yaw = this.mouse.x
     const pitch = this.mouse.y
 
     // ===== INPUT =====
-
     let moveX = this.input.x
     let moveZ = this.input.z
 
     // mobile joystick
     if (this.mobile) {
-      moveX += this.mobile.input.moveX * this.currentSpeed
-      moveZ += -this.mobile.input.moveY * this.currentSpeed
+      moveX += -this.mobile.input.moveX
+      moveZ += -this.mobile.input.moveY
 
       // JUMP
-
       if (this.mobile.input.jump && !this.mobileStates.jumpPressed) {
         this.mobileStates.jumpPressed = true
         this.jump()
@@ -226,7 +223,6 @@ export class Player {
       }
 
       // ROLL
-
       if (this.mobile.input.roll && !this.mobileStates.rollPressed) {
         this.mobileStates.rollPressed = true
         this.dash()
@@ -238,27 +234,32 @@ export class Player {
     }
 
     // ===== MOVIMENTO RELATIVO À CÂMERA =====
+    const inputVector = new Vector3(moveX, 0, moveZ)
 
-    const direction = new Vector3()
+    // intensidade original
+    let strength = inputVector.length()
+    // limita diagonal
+    strength = Math.min(strength, 1)
 
-    if (moveX !== 0 || moveZ !== 0) {
-      direction.set(
-        Math.sin(yaw) * moveZ + Math.cos(yaw) * moveX,
-        0,
-        Math.cos(yaw) * moveZ - Math.sin(yaw) * moveX,
-      )
-
-      direction.normalize()
+    // normaliza apenas direção
+    if (inputVector.length() > 0) {
+      inputVector.normalize()
     }
 
-    const move = new Vector3(
-      direction.x * this.currentSpeed,
+    // ===== DIREÇÃO RELATIVA À CÂMERA =====
+
+    const direction = new Vector3(
+      Math.sin(yaw) * inputVector.z + Math.cos(yaw) * inputVector.x,
       0,
-      direction.z * this.currentSpeed,
+      Math.cos(yaw) * inputVector.z - Math.sin(yaw) * inputVector.x,
     )
 
-    const vel = this.body.linvel()
+    // ===== VELOCIDADE ANALÓGICA =====
 
+    const speed = this.mobile ? this.runSpeed * strength : this.currentSpeed
+    const move = direction.multiplyScalar(speed)
+
+    const vel = this.body.linvel()
     this.body.setLinvel(
       {
         x: move.x,
@@ -269,17 +270,13 @@ export class Player {
     )
 
     // ===== SYNC =====
-
     const pos = this.body.translation()
-
     this.mesh.position.set(pos.x, pos.y, pos.z)
 
     // ===== CAMERA SYSTEM =====
-    // recuperado do outro player
-
-    const distance = 6
-    const height = 1.5
-    const shoulderOffset = 0
+    const distance = 1.8
+    const height = 1.2
+    const shoulderOffset = 1.5
 
     const target = new Vector3(
       this.position.x,
@@ -298,9 +295,7 @@ export class Player {
 
     // offset ombro
     const up = new Vector3(0, 1, 0)
-
     const right = new Vector3().crossVectors(dir, up).normalize()
-
     cameraPos.add(right.multiplyScalar(shoulderOffset))
 
     // suavização
@@ -308,12 +303,13 @@ export class Player {
 
     // look target
     const lookTarget = target.clone().add(dir.clone().multiplyScalar(10))
-
     this.camera.lookAt(lookTarget)
 
     // ===== DEBUG =====
-
     document.getElementById('player-position').innerHTML = this.toString()
+
+    const horizontalSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z)
+    console.log(`SPEED: ${horizontalSpeed.toFixed(2)}`)
   }
 
   isOnGround() {
@@ -325,7 +321,6 @@ export class Player {
     )
 
     const hit = this.world.castRay(ray, this.height / 2 + 0.15, true)
-
     return hit !== null
   }
 
@@ -333,7 +328,6 @@ export class Player {
     if (!this.isOnGround()) return
 
     const vel = this.body.linvel()
-
     this.body.setLinvel(
       {
         x: vel.x,
@@ -346,7 +340,6 @@ export class Player {
 
   dash() {
     const yaw = this.mouse.x
-
     const forward = new Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize()
 
     this.body.applyImpulse(
