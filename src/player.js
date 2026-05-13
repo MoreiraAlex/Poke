@@ -9,7 +9,7 @@ import {
 
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
 import { MobileControls } from './mobileControls'
-import { loadFBX } from '../../Pokemon/src/utils/loader'
+import { loadFBX } from './utils/loader'
 
 export class Player {
   constructor(scene, rapier, physicsWorld) {
